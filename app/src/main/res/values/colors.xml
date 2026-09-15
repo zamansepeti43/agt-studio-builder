@@ -1,0 +1,8 @@
+<resources>
+    <color name="agt_bg">#070B16</color>
+    <color name="agt_card">#111827</color>
+    <color name="agt_card2">#0F172A</color>
+    <color name="agt_text">#F8FAFC</color>
+    <color name="agt_muted">#94A3B8</color>
+    <color name="agt_blue">#38BDF8</color>
+</resources>
