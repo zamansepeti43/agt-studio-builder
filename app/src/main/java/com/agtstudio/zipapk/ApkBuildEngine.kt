@@ -24,18 +24,7 @@ class ApkBuildEngine(private val context: Context) {
             .trim()
             .take(60)
             .ifBlank { "AGT Uygulama" }
-        val packagePart = displayName
-            .replace("ç", "c").replace("Ç", "c")
-            .replace("ğ", "g").replace("Ğ", "g")
-            .replace("ı", "i").replace("İ", "i")
-            .replace("ö", "o").replace("Ö", "o")
-            .replace("ş", "s").replace("Ş", "s")
-            .replace("ü", "u").replace("Ü", "u")
-            .lowercase(Locale.ROOT)
-            .replace(Regex("[^a-z0-9]"), "")
-            .take(18)
-            .ifBlank { "app" }
-        val packageName = "com.agtstudio.generated.$packagePart"
+
         val work = File(context.cacheDir, "agt_${System.currentTimeMillis()}").apply { mkdirs() }
         try {
             onProgress("ZIP okunuyor…")
@@ -43,6 +32,30 @@ class ApkBuildEngine(private val context: Context) {
             context.contentResolver.openInputStream(zipUri)?.use { i ->
                 FileOutputStream(input).use { o -> i.copyTo(o) }
             } ?: error("ZIP dosyası okunamadı.")
+
+            // AGT Studio self-package: the ZIP carries a complete AGT Studio APK.
+            // This lets the current builder reproduce itself without converting the
+            // native builder UI into an HTML approximation.
+            val selfApk = findSelfApk(input, work)
+            if (selfApk != null) {
+                onProgress("AGT Studio paketi algılandı…")
+                val generated = File(work, "$fileName.apk")
+                selfApk.inputStream().use { source -> generated.outputStream().use { target -> source.copyTo(target) } }
+                return saveApkToDownloads(generated, fileName, onProgress)
+            }
+
+            val displayNamePackage = displayName
+                .replace("ç", "c").replace("Ç", "c")
+                .replace("ğ", "g").replace("Ğ", "g")
+                .replace("ı", "i").replace("İ", "i")
+                .replace("ö", "o").replace("Ö", "o")
+                .replace("ş", "s").replace("Ş", "s")
+                .replace("ü", "u").replace("Ü", "u")
+                .lowercase(Locale.ROOT)
+                .replace(Regex("[^a-z0-9]"), "")
+                .take(18)
+                .ifBlank { "app" }
+            val packageName = "com.agtstudio.generated.$displayNamePackage"
 
             val web = File(work, "web").apply { mkdirs() }
             extractSafely(input, web)
@@ -106,38 +119,70 @@ class ApkBuildEngine(private val context: Context) {
                 icons
             )
 
-            onProgress("APK Download klasörüne kaydediliyor…")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, "$fileName.apk")
-                    put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
-                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")
-                    put(MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                    ?: error("APK Download klasörüne kaydedilemedi.")
-                try {
-                    context.contentResolver.openOutputStream(uri)?.use { output ->
-                        generated.inputStream().use { input -> input.copyTo(output) }
-                    } ?: error("APK dosyası yazılamadı.")
-                    values.clear()
-                    values.put(MediaStore.Downloads.IS_PENDING, 0)
-                    context.contentResolver.update(uri, values, null, null)
-                    onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
-                    return generated
-                } catch (e: Exception) {
-                    context.contentResolver.delete(uri, null, null)
-                    throw e
-                }
-            } else {
-                val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AGT Studio").apply { mkdirs() }
-                val out = File(outDir, "$fileName.apk")
-                generated.inputStream().use { input -> out.outputStream().use { output -> input.copyTo(output) } }
-                onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
-                return out
-            }
+            return saveApkToDownloads(generated, fileName, onProgress)
         } finally {
             work.deleteRecursively()
+        }
+    }
+
+    private fun findSelfApk(input: File, work: File): File? {
+        ZipFile(input).use { zip ->
+            val names = listOf(
+                "AGT-Studio-Builder.apk",
+                "agt-studio-builder.apk",
+                "payload/AGT-Studio-Builder.apk",
+                "payload/agt-studio-builder.apk"
+            )
+            for (name in names) {
+                val entry = zip.getEntry(name) ?: continue
+                val out = File(work, "self-builder.apk")
+                zip.getInputStream(entry).use { source -> out.outputStream().use { target -> source.copyTo(target) } }
+                return out
+            }
+            // Also accept a single APK at the ZIP root/payload for convenience.
+            val apkEntry = zip.entries().asSequence().firstOrNull {
+                !it.isDirectory && it.name.lowercase(Locale.ROOT).endsWith(".apk") &&
+                    (it.name.substringBeforeLast('/').isEmpty() || it.name.substringBeforeLast('/').equals("payload", true))
+            }
+            if (apkEntry != null) {
+                val out = File(work, "self-builder.apk")
+                zip.getInputStream(apkEntry).use { source -> out.outputStream().use { target -> source.copyTo(target) } }
+                return out
+            }
+        }
+        return null
+    }
+
+    private fun saveApkToDownloads(generated: File, fileName: String, onProgress: (String) -> Unit): File {
+        onProgress("APK Download klasörüne kaydediliyor…")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, "$fileName.apk")
+                put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("APK Download klasörüne kaydedilemedi.")
+            try {
+                context.contentResolver.openOutputStream(uri)?.use { output ->
+                    generated.inputStream().use { input -> input.copyTo(output) }
+                } ?: error("APK dosyası yazılamadı.")
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                context.contentResolver.update(uri, values, null, null)
+                onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
+                return generated
+            } catch (e: Exception) {
+                context.contentResolver.delete(uri, null, null)
+                throw e
+            }
+        } else {
+            val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AGT Studio").apply { mkdirs() }
+            val out = File(outDir, "$fileName.apk")
+            generated.inputStream().use { input -> out.outputStream().use { output -> input.copyTo(output) } }
+            onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
+            return out
         }
     }
 
