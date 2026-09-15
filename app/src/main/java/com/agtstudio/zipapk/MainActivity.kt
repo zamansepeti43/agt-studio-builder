@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 progress.visibility = View.GONE
                 txtStatus.text = "✓ APK hazır: ${result.name}"
-                toast("APK oluşturuldu. Dosya: ${result.absolutePath}")
+                toast("APK oluşturuldu. Konum: Download/AGT Studio/${result.name}")
             } catch (e: Exception) {
                 progress.visibility = View.GONE
                 txtStatus.text = "Hata: ${e.message ?: "Bilinmeyen hata"}"
