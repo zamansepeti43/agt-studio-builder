@@ -1,17 +1,40 @@
 package com.agtstudio.zipapk
 
+import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import com.iappyx.container.ApkInjector
 import com.iappyx.container.KeyManager
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.util.zip.ZipFile
 
 class ApkBuildEngine(private val context: Context) {
     suspend fun build(zipUri: Uri, appName: String, logoUri: Uri?, onProgress: (String) -> Unit): File {
-        val safeName = appName.trim().replace(Regex("[^A-Za-z0-9._-]+"), "_").take(40).ifBlank { "AGT_App" }
-        val packageName = "com.agtstudio.generated." + safeName.lowercase().replace(Regex("[^a-z0-9]"), "").take(18).ifBlank { "app" }
+        val displayName = appName.trim().take(40).ifBlank { "AGT Uygulama" }
+        val fileName = displayName
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .trim()
+            .take(60)
+            .ifBlank { "AGT Uygulama" }
+        val packagePart = displayName
+            .replace("ç", "c").replace("Ç", "c")
+            .replace("ğ", "g").replace("Ğ", "g")
+            .replace("ı", "i").replace("İ", "i")
+            .replace("ö", "o").replace("Ö", "o")
+            .replace("ş", "s").replace("Ş", "s")
+            .replace("ü", "u").replace("Ü", "u")
+            .lowercase()
+            .replace(Regex("[^a-z0-9]"), "")
+            .take(18)
+            .ifBlank { "app" }
+        val packageName = "com.agtstudio.generated.$packagePart"
         val work = File(context.cacheDir, "agt_${System.currentTimeMillis()}").apply { mkdirs() }
         try {
             onProgress("ZIP okunuyor…")
@@ -23,9 +46,6 @@ class ApkBuildEngine(private val context: Context) {
             val web = File(work, "web").apply { mkdirs() }
             extractSafely(input, web)
 
-            // Accept normal website ZIPs, nested project folders, index.htm, and
-            // archives that contain another website ZIP. The generated shell
-            // always receives a canonical index.html at the selected web root.
             var index = findEntryHtml(web)
             if (index == null) {
                 val nestedZip = web.walkTopDown()
@@ -45,9 +65,7 @@ class ApkBuildEngine(private val context: Context) {
             val entry = index ?: error("ZIP içinde HTML sayfası bulunamadı. index.html veya index.htm bulunmalı.")
             val root = entry.parentFile ?: web
             val canonicalIndex = File(root, "index.html")
-            if (entry.name != "index.html") {
-                entry.copyTo(canonicalIndex, overwrite = true)
-            }
+            if (entry.name != "index.html") entry.copyTo(canonicalIndex, overwrite = true)
 
             val assets = linkedMapOf<String, ByteArray>()
             root.walkTopDown().filter { it.isFile }.forEach { f ->
@@ -55,9 +73,19 @@ class ApkBuildEngine(private val context: Context) {
                 assets[rel] = f.readBytes()
             }
 
+            val icons = linkedMapOf<String, ByteArray>()
             if (logoUri != null) {
-                onProgress("Logo ekleniyor…")
-                context.contentResolver.openInputStream(logoUri)?.use { assets["agt-logo.png"] = it.readBytes() }
+                onProgress("Logo hazırlanıyor…")
+                val logoBytes = createIconPng(logoUri)
+                assets["agt-logo.png"] = logoBytes
+                val iconPaths = listOf(
+                    "res/mipmap-mdpi/ic_launcher.png",
+                    "res/mipmap-hdpi/ic_launcher.png",
+                    "res/mipmap-xhdpi/ic_launcher.png",
+                    "res/mipmap-xxhdpi/ic_launcher.png",
+                    "res/mipmap-xxxhdpi/ic_launcher.png"
+                )
+                iconPaths.forEach { icons[it] = logoBytes }
             }
 
             val template = File(work, "shell_template.apk")
@@ -66,27 +94,77 @@ class ApkBuildEngine(private val context: Context) {
             }
 
             KeyManager.ensureKeyExists(context)
-            val outDir = File(context.getExternalFilesDir(null), "AGT Studio/APKs").apply { mkdirs() }
-            val out = File(outDir, "$safeName.apk")
+            val generated = File(work, "$fileName.apk")
             onProgress("APK oluşturuluyor ve imzalanıyor…")
-            ApkInjector(KeyManager.KEY_ALIAS).inject(template, out, packageName, safeName, assets)
-            onProgress("APK hazır: ${out.name}")
-            return out
+            ApkInjector(KeyManager.KEY_ALIAS).inject(
+                template,
+                generated,
+                packageName,
+                displayName,
+                assets,
+                icons
+            )
+
+            onProgress("APK Download klasörüne kaydediliyor…")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, "$fileName.apk")
+                    put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                    ?: error("APK Download klasörüne kaydedilemedi.")
+                try {
+                    context.contentResolver.openOutputStream(uri)?.use { output ->
+                        generated.inputStream().use { input -> input.copyTo(output) }
+                    } ?: error("APK dosyası yazılamadı.")
+                    values.clear()
+                    values.put(MediaStore.Downloads.IS_PENDING, 0)
+                    context.contentResolver.update(uri, values, null, null)
+                    onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
+                    return generated
+                } catch (e: Exception) {
+                    context.contentResolver.delete(uri, null, null)
+                    throw e
+                }
+            } else {
+                val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AGT Studio").apply { mkdirs() }
+                val out = File(outDir, "$fileName.apk")
+                generated.inputStream().use { input -> out.outputStream().use { output -> input.copyTo(output) } }
+                onProgress("✓ APK hazır: Download/AGT Studio/$fileName.apk")
+                return out
+            }
         } finally {
             work.deleteRecursively()
         }
     }
 
+    private fun createIconPng(uri: Uri): ByteArray {
+        val bitmap = context.contentResolver.openInputStream(uri)?.use { input ->
+            BitmapFactory.decodeStream(input)
+        } ?: error("Logo okunamadı.")
+        val square = Bitmap.createBitmap(512, 512, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(square)
+        val scale = minOf(512f / bitmap.width, 512f / bitmap.height)
+        val w = bitmap.width * scale
+        val h = bitmap.height * scale
+        val left = (512f - w) / 2f
+        val top = (512f - h) / 2f
+        canvas.drawBitmap(bitmap, null, android.graphics.RectF(left, top, left + w, top + h), null)
+        if (square !== bitmap) bitmap.recycle()
+        return ByteArrayOutputStream().use { out ->
+            square.compress(Bitmap.CompressFormat.PNG, 100, out)
+            square.recycle()
+            out.toByteArray()
+        }
+    }
+
     private fun findEntryHtml(root: File): File? {
-        val preferred = root.walkTopDown()
-            .filter { it.isFile }
+        val preferred = root.walkTopDown().filter { it.isFile }
             .firstOrNull { it.name.equals("index.html", true) || it.name.equals("index.htm", true) }
         if (preferred != null) return preferred
-
-        // Last-resort compatibility: accept the first HTML document in the ZIP
-        // so older/simple web projects without an index filename can still build.
-        return root.walkTopDown()
-            .filter { it.isFile }
+        return root.walkTopDown().filter { it.isFile }
             .firstOrNull { it.extension.equals("html", true) || it.extension.equals("htm", true) }
     }
 
