@@ -22,9 +22,16 @@ class MainActivity : AppCompatActivity() {
 
     private val zipPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@registerForActivityResult
+        val fileName = getDisplayName(uri)
+        if (!fileName.lowercase().endsWith(".zip")) {
+            zipUri = null
+            txtZip.text = "Henüz ZIP seçilmedi"
+            txtStatus.text = "Lütfen yalnızca .ZIP dosyası seç."
+            toast("Bu dosya ZIP değil. Lütfen .zip dosyası seç.")
+            return@registerForActivityResult
+        }
         zipUri = uri
         try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) {}
-        val fileName = getDisplayName(uri)
         val size = getDisplaySize(uri)
         txtZip.text = if (size != null) "Seçildi: $fileName • $size" else "Seçildi: $fileName"
         txtStatus.text = "ZIP hazır. Şimdi isim ve logo seçebilirsin."
@@ -48,7 +55,11 @@ class MainActivity : AppCompatActivity() {
         edtName = findViewById(R.id.edtAppName)
 
         findViewById<View>(R.id.btnPickZip).setOnClickListener {
-            zipPicker.launch(arrayOf("application/zip", "application/octet-stream", "application/x-zip-compressed", "*/*"))
+            zipPicker.launch(arrayOf(
+                "application/zip",
+                "application/x-zip-compressed",
+                "application/octet-stream"
+            ))
         }
         findViewById<View>(R.id.btnPickLogo).setOnClickListener {
             logoPicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/*"))
@@ -84,7 +95,14 @@ class MainActivity : AppCompatActivity() {
     private fun createApk() {
         val zip = zipUri
         val name = edtName.text.toString().trim()
-        if (zip == null) { toast("Önce ZIP dosyasını seç."); return }
+        if (zip == null) { toast("Önce bir ZIP dosyası seç."); return }
+        val selectedName = getDisplayName(zip)
+        if (!selectedName.lowercase().endsWith(".zip")) {
+            zipUri = null
+            txtZip.text = "Henüz ZIP seçilmedi"
+            toast("Lütfen yalnızca .zip dosyası seç.")
+            return
+        }
         if (name.isBlank()) { edtName.error = "Uygulama adını gir."; return }
 
         progress.visibility = View.VISIBLE
