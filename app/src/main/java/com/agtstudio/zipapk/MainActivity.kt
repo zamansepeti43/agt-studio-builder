@@ -113,7 +113,7 @@ class MainActivity : AppCompatActivity() {
                     runOnUiThread { txtStatus.text = msg }
                 }
                 progress.visibility = View.GONE
-                txtStatus.text = "✓ APK hazır: ${result.name}"
+                txtStatus.text = "✓ APK hazır: Download/AGT Studio/${result.name}"
                 toast("APK oluşturuldu. Konum: Download/AGT Studio/${result.name}")
             } catch (e: Exception) {
                 progress.visibility = View.GONE
