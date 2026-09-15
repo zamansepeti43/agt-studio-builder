@@ -33,14 +33,20 @@ class ApkBuildEngine(private val context: Context) {
                 FileOutputStream(input).use { o -> i.copyTo(o) }
             } ?: error("ZIP dosyası okunamadı.")
 
-            // AGT Studio self-package: the ZIP carries a complete AGT Studio APK.
-            // This lets the current builder reproduce itself without converting the
-            // native builder UI into an HTML approximation.
+            // AGT Studio self-package: preserve the native builder while allowing
+            // the selected logo to become its launcher icon.
             val selfApk = findSelfApk(input, work)
             if (selfApk != null) {
                 onProgress("AGT Studio paketi algılandı…")
                 val generated = File(work, "$fileName.apk")
-                selfApk.inputStream().use { source -> generated.outputStream().use { target -> source.copyTo(target) } }
+                if (logoUri != null) {
+                    onProgress("Seçilen logo APK'ya uygulanıyor…")
+                    val logoBytes = createIconPng(logoUri)
+                    KeyManager.ensureKeyExists(context)
+                    SelfPackageIconPatcher.patchAndSign(selfApk, generated, logoBytes)
+                } else {
+                    selfApk.inputStream().use { source -> generated.outputStream().use { target -> source.copyTo(target) } }
+                }
                 return saveApkToDownloads(generated, fileName, onProgress)
             }
 
@@ -139,7 +145,6 @@ class ApkBuildEngine(private val context: Context) {
                 zip.getInputStream(entry).use { source -> out.outputStream().use { target -> source.copyTo(target) } }
                 return out
             }
-            // Also accept a single APK at the ZIP root/payload for convenience.
             val apkEntry = zip.entries().asSequence().firstOrNull {
                 !it.isDirectory && it.name.lowercase(Locale.ROOT).endsWith(".apk") &&
                     (it.name.substringBeforeLast('/').isEmpty() || it.name.substringBeforeLast('/').equals("payload", true))
