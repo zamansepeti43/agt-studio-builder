@@ -13,11 +13,12 @@ import com.iappyx.container.KeyManager
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
 import java.util.zip.ZipFile
 
 class ApkBuildEngine(private val context: Context) {
     suspend fun build(zipUri: Uri, appName: String, logoUri: Uri?, onProgress: (String) -> Unit): File {
-        val displayName = appName.trim().take(40).ifBlank { "AGT Uygulama" }
+        val displayName = appName.trim().take(37).ifBlank { "AGT Uygulama" }
         val fileName = displayName
             .replace(Regex("[\\\\/:*?\"<>|]"), "_")
             .trim()
@@ -30,7 +31,7 @@ class ApkBuildEngine(private val context: Context) {
             .replace("ö", "o").replace("Ö", "o")
             .replace("ş", "s").replace("Ş", "s")
             .replace("ü", "u").replace("Ü", "u")
-            .lowercase()
+            .lowercase(Locale.ROOT)
             .replace(Regex("[^a-z0-9]"), "")
             .take(18)
             .ifBlank { "app" }
@@ -79,11 +80,11 @@ class ApkBuildEngine(private val context: Context) {
                 val logoBytes = createIconPng(logoUri)
                 assets["agt-logo.png"] = logoBytes
                 val iconPaths = listOf(
-                    "res/mipmap-mdpi/ic_launcher.png",
-                    "res/mipmap-hdpi/ic_launcher.png",
-                    "res/mipmap-xhdpi/ic_launcher.png",
-                    "res/mipmap-xxhdpi/ic_launcher.png",
-                    "res/mipmap-xxxhdpi/ic_launcher.png"
+                    "res/mipmap-mdpi-v4/ic_launcher.png",
+                    "res/mipmap-hdpi-v4/ic_launcher.png",
+                    "res/mipmap-xhdpi-v4/ic_launcher.png",
+                    "res/mipmap-xxhdpi-v4/ic_launcher.png",
+                    "res/mipmap-xxxhdpi-v4/ic_launcher.png"
                 )
                 iconPaths.forEach { icons[it] = logoBytes }
             }
