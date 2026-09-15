@@ -36,6 +36,7 @@ jobs:
           sudo unzip -q /tmp/gradle.zip -d /opt
           echo "/opt/gradle-8.9/bin" >> "$GITHUB_PATH"
 
+      # Build includes the current manual-share UI fix.
       - name: Build debug APK
         run: gradle :app:assembleDebug --stacktrace
 
