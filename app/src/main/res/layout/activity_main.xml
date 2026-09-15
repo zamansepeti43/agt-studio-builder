@@ -34,5 +34,6 @@
         <TextView android:id="@+id/btnCreate" android:layout_width="match_parent" android:layout_height="58dp" android:layout_marginTop="20dp" android:background="@drawable/bg_button" android:gravity="center" android:text="APK OLUŞTUR" android:textColor="#06111F" android:textStyle="bold" android:textSize="16sp"/>
         <ProgressBar android:id="@+id/progress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginTop="18dp" android:visibility="gone"/>
         <TextView android:id="@+id/txtStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:textColor="#94A3B8" android:textSize="13sp"/>
+        <TextView android:id="@+id/btnShare" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="12dp" android:background="@drawable/bg_button" android:gravity="center" android:text="APK'Yİ PAYLAŞ" android:textColor="#06111F" android:textStyle="bold" android:textSize="15sp" android:visibility="gone"/>
     </LinearLayout>
 </ScrollView>
