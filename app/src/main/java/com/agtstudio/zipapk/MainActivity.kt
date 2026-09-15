@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
                 txtStatus.text = "✓ APK başarıyla kaydedildi\nDownload/AGT Studio/${result.name}"
                 btnShare.visibility = View.VISIBLE
                 btnShare.isEnabled = true
-                toast("APK kaydedildi. Artık aşağıdaki PAYLAŞ butonunu kullanabilirsin.")
+                toast("APK kaydedildi. Aşağıdaki PAYLAŞ butonunu kullanabilirsin.")
             } catch (e: Exception) {
                 progress.visibility = View.GONE
                 btnShare.visibility = View.GONE
@@ -148,7 +148,7 @@ class MainActivity : AppCompatActivity() {
         }
         val uri = findDownloadedApkUri(name) ?: lastApkFile?.let { file ->
             if (file.exists()) {
-                FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
+                FileProvider.getUriForFile(this, "com.agtstudio.zipapk.fileprovider", file)
             } else null
         }
         if (uri == null) {
@@ -156,7 +156,6 @@ class MainActivity : AppCompatActivity() {
             txtStatus.text = "APK bulunamadı. Lütfen yeniden oluştur."
             return
         }
-
         try {
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/vnd.android.package-archive"
@@ -172,7 +171,7 @@ class MainActivity : AppCompatActivity() {
     private fun findDownloadedApkUri(fileName: String): Uri? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
         val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME)
+        val projection = arrayOf(MediaStore.Downloads._ID)
         val selection = "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH}=?"
         val args = arrayOf(fileName, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")
         contentResolver.query(collection, projection, selection, args, "${MediaStore.Downloads.DATE_ADDED} DESC")?.use { cursor ->
