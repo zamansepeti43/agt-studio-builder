@@ -1,15 +1,21 @@
 package com.agtstudio.zipapk
 
+import android.content.ContentUris
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
     private lateinit var txtZip: TextView
@@ -17,8 +23,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var txtStatus: TextView
     private lateinit var progress: ProgressBar
     private lateinit var edtName: EditText
+    private lateinit var btnShare: TextView
     private var zipUri: Uri? = null
     private var logoUri: Uri? = null
+    private var lastApkFile: File? = null
+    private var lastApkName: String? = null
 
     private val zipPicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@registerForActivityResult
@@ -53,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         txtStatus = findViewById(R.id.txtStatus)
         progress = findViewById(R.id.progress)
         edtName = findViewById(R.id.edtAppName)
+        btnShare = findViewById(R.id.btnShare)
 
         findViewById<View>(R.id.btnPickZip).setOnClickListener {
             zipPicker.launch(arrayOf(
@@ -65,6 +75,7 @@ class MainActivity : AppCompatActivity() {
             logoPicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/*"))
         }
         findViewById<View>(R.id.btnCreate).setOnClickListener { createApk() }
+        btnShare.setOnClickListener { shareLastApk() }
     }
 
     private fun getDisplayName(uri: Uri): String {
@@ -105,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         }
         if (name.isBlank()) { edtName.error = "Uygulama adını gir."; return }
 
+        btnShare.visibility = View.GONE
         progress.visibility = View.VISIBLE
         txtStatus.text = "ZIP kontrol ediliyor…"
         lifecycleScope.launch {
@@ -112,15 +124,64 @@ class MainActivity : AppCompatActivity() {
                 val result = ApkBuildEngine(this@MainActivity).build(zip, name, logoUri) { msg ->
                     runOnUiThread { txtStatus.text = msg }
                 }
+                lastApkFile = result
+                lastApkName = result.name
                 progress.visibility = View.GONE
-                txtStatus.text = "✓ APK hazır: Download/AGT Studio/${result.name}"
-                toast("APK oluşturuldu. Konum: Download/AGT Studio/${result.name}")
+                txtStatus.text = "✓ APK başarıyla kaydedildi\nDownload/AGT Studio/${result.name}"
+                btnShare.visibility = View.VISIBLE
+                btnShare.isEnabled = true
+                toast("APK kaydedildi. Artık aşağıdaki PAYLAŞ butonunu kullanabilirsin.")
             } catch (e: Exception) {
                 progress.visibility = View.GONE
+                btnShare.visibility = View.GONE
                 txtStatus.text = "Hata: ${e.message ?: "Bilinmeyen hata"}"
                 toast(e.message ?: "APK oluşturulamadı.")
             }
         }
+    }
+
+    private fun shareLastApk() {
+        val name = lastApkName
+        if (name.isNullOrBlank()) {
+            toast("Önce APK oluştur.")
+            return
+        }
+        val uri = findDownloadedApkUri(name) ?: lastApkFile?.let { file ->
+            if (file.exists()) {
+                FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", file)
+            } else null
+        }
+        if (uri == null) {
+            toast("APK dosyası bulunamadı. Download/AGT Studio klasörünü kontrol et.")
+            txtStatus.text = "APK bulunamadı. Lütfen yeniden oluştur."
+            return
+        }
+
+        try {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/vnd.android.package-archive"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(shareIntent, "APK paylaş"))
+        } catch (e: Exception) {
+            toast("Paylaşım açılamadı: ${e.message ?: "Bilinmeyen hata"}")
+        }
+    }
+
+    private fun findDownloadedApkUri(fileName: String): Uri? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(MediaStore.Downloads._ID, MediaStore.Downloads.DISPLAY_NAME)
+        val selection = "${MediaStore.Downloads.DISPLAY_NAME}=? AND ${MediaStore.Downloads.RELATIVE_PATH}=?"
+        val args = arrayOf(fileName, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")
+        contentResolver.query(collection, projection, selection, args, "${MediaStore.Downloads.DATE_ADDED} DESC")?.use { cursor ->
+            val idIndex = cursor.getColumnIndexOrThrow(MediaStore.Downloads._ID)
+            if (cursor.moveToFirst()) {
+                return ContentUris.withAppendedId(collection, cursor.getLong(idIndex))
+            }
+        }
+        return null
     }
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
