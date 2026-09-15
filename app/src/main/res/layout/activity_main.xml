@@ -1,0 +1,38 @@
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rootScroll"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_screen"
+    android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="AGT STUDIO" android:textColor="#38BDF8" android:textStyle="bold" android:textSize="13sp"/>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="Uygulama Oluştur" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="30sp"/>
+        <TextView android:id="@+id/txtSubtitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="ZIP dosyanı seç, uygulama adını ve logosunu belirle; APK'yi telefonda oluştur." android:textColor="#94A3B8" android:textSize="14sp"/>
+        <LinearLayout android:id="@+id/cardZip" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp" android:background="@drawable/bg_card" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="1  •  Uygulama dosyası" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="17sp"/>
+            <TextView android:id="@+id/txtZip" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="ZIP dosyası seçilmedi" android:textColor="#94A3B8" android:textSize="14sp"/>
+            <TextView android:id="@+id/btnPickZip" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="@drawable/bg_button" android:paddingLeft="18dp" android:paddingRight="18dp" android:paddingTop="11dp" android:paddingBottom="11dp" android:text="ZIP DOSYASI YÜKLE" android:textColor="#06111F" android:textStyle="bold"/>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="@drawable/bg_card" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="2  •  Uygulama adı" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="17sp"/>
+            <EditText android:id="@+id/edtAppName" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:hint="Örn. Parça Avcısı" android:singleLine="true" android:textColor="#F8FAFC" android:textColorHint="#64748B" android:backgroundTint="#38BDF8"/>
+        </LinearLayout>
+        <LinearLayout android:id="@+id/cardLogo" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="@drawable/bg_card" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="3  •  Uygulama logosu" android:textColor="#F8FAFC" android:textStyle="bold" android:textSize="17sp"/>
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center_vertical" android:orientation="horizontal">
+                <ImageView android:id="@+id/imgLogo" android:layout_width="76dp" android:layout_height="76dp" android:background="#0F172A" android:scaleType="centerCrop" android:contentDescription="Logo önizleme"/>
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp" android:orientation="vertical">
+                    <TextView android:id="@+id/txtLogo" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Logo seçilmedi" android:textColor="#94A3B8" android:textSize="14sp"/>
+                    <TextView android:id="@+id/btnPickLogo" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/bg_button" android:paddingLeft="16dp" android:paddingRight="16dp" android:paddingTop="9dp" android:paddingBottom="9dp" android:text="LOGO EKLE" android:textColor="#06111F" android:textStyle="bold"/>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+        <TextView android:id="@+id/btnCreate" android:layout_width="match_parent" android:layout_height="58dp" android:layout_marginTop="20dp" android:background="@drawable/bg_button" android:gravity="center" android:text="APK OLUŞTUR" android:textColor="#06111F" android:textStyle="bold" android:textSize="16sp"/>
+        <ProgressBar android:id="@+id/progress" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center" android:layout_marginTop="18dp" android:visibility="gone"/>
+        <TextView android:id="@+id/txtStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:gravity="center" android:textColor="#94A3B8" android:textSize="13sp"/>
+    </LinearLayout>
+</ScrollView>
