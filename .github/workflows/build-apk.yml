@@ -13,6 +13,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Patch public APK output
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/agtstudio/zipapk/ApkBuildEngine.kt')
+          s = p.read_text()
+          s = s.replace('import android.content.Context\n', 'import android.content.ContentValues\nimport android.content.Context\n')
+          s = s.replace('import android.net.Uri\n', 'import android.net.Uri\nimport android.os.Build\nimport android.os.Environment\nimport android.provider.MediaStore\n')
+          s = s.replace('import java.io.FileOutputStream\n', 'import java.io.FileOutputStream\n')
+          old = '''            KeyManager.ensureKeyExists(context)\n            val outDir = File(context.getExternalFilesDir(null), "AGT Studio/APKs").apply { mkdirs() }\n            val out = File(outDir, "$safeName.apk")\n            onProgress("APK oluşturuluyor ve imzalanıyor…")\n            ApkInjector(KeyManager.KEY_ALIAS).inject(template, out, packageName, safeName, assets)\n            onProgress("APK hazır: ${out.name}")\n            return out\n'''
+          new = '''            KeyManager.ensureKeyExists(context)\n            val generated = File(work, "$safeName.apk")\n            onProgress("APK oluşturuluyor ve imzalanıyor…")\n            ApkInjector(KeyManager.KEY_ALIAS).inject(template, generated, packageName, safeName, assets)\n            onProgress("APK Download klasörüne kaydediliyor…")\n            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {\n                val values = ContentValues().apply {\n                    put(MediaStore.Downloads.DISPLAY_NAME, "$safeName.apk")\n                    put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")\n                    put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/AGT Studio/")\n                    put(MediaStore.Downloads.IS_PENDING, 1)\n                }\n                val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)\n                    ?: error("APK Download klasörüne kaydedilemedi.")\n                try {\n                    context.contentResolver.openOutputStream(uri)?.use { output ->\n                        generated.inputStream().use { input -> input.copyTo(output) }\n                    } ?: error("APK dosyası yazılamadı.")\n                    values.clear()\n                    values.put(MediaStore.Downloads.IS_PENDING, 0)\n                    context.contentResolver.update(uri, values, null, null)\n                    onProgress("APK hazır: Download/AGT Studio/$safeName.apk")\n                    return generated\n                } catch (e: Exception) {\n                    context.contentResolver.delete(uri, null, null)\n                    throw e\n                }\n            } else {\n                val outDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "AGT Studio").apply { mkdirs() }\n                val out = File(outDir, "$safeName.apk")\n                generated.inputStream().use { input -> out.outputStream().use { output -> input.copyTo(output) } }\n                onProgress("APK hazır: ${out.absolutePath}")\n                return out\n            }\n'''
+          if old not in s:
+              raise SystemExit('Expected output block not found; aborting without changes')
+          p.write_text(s.replace(old, new))
+          PY
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
