@@ -145,9 +145,16 @@ class ApkBuildEngine(private val context: Context) {
                 zip.getInputStream(entry).use { source -> out.outputStream().use { target -> source.copyTo(target) } }
                 return out
             }
+            // Also accept any APK at the ZIP root or inside a payload directory.
+            // substringBeforeLast('/') returns the whole string when '/' is absent,
+            // so explicitly use an empty missing-delimiter value for root entries.
             val apkEntry = zip.entries().asSequence().firstOrNull {
-                !it.isDirectory && it.name.lowercase(Locale.ROOT).endsWith(".apk") &&
-                    (it.name.substringBeforeLast('/').isEmpty() || it.name.substringBeforeLast('/').equals("payload", true))
+                if (it.isDirectory || !it.name.lowercase(Locale.ROOT).endsWith(".apk")) {
+                    false
+                } else {
+                    val parent = it.name.substringBeforeLast('/', missingDelimiterValue = "")
+                    parent.isEmpty() || parent.equals("payload", true)
+                }
             }
             if (apkEntry != null) {
                 val out = File(work, "self-builder.apk")
