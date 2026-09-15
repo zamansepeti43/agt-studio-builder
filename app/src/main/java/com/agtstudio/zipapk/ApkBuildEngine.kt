@@ -34,16 +34,16 @@ class ApkBuildEngine(private val context: Context) {
             } ?: error("ZIP dosyası okunamadı.")
 
             // AGT Studio self-package: preserve the native builder while allowing
-            // the selected logo to become its launcher icon.
+            // the selected logo and app name to become the generated APK's identity.
             val selfApk = findSelfApk(input, work)
             if (selfApk != null) {
                 onProgress("AGT Studio paketi algılandı…")
                 val generated = File(work, "$fileName.apk")
                 if (logoUri != null) {
-                    onProgress("Seçilen logo APK'ya uygulanıyor…")
+                    onProgress("Seçilen logo ve uygulama adı APK'ya uygulanıyor…")
                     val logoBytes = createIconPng(logoUri)
                     KeyManager.ensureKeyExists(context)
-                    SelfPackageIconPatcher.patchAndSign(selfApk, generated, logoBytes)
+                    SelfPackageIconPatcher.patchAndSign(selfApk, generated, logoBytes, displayName)
                 } else {
                     selfApk.inputStream().use { source -> generated.outputStream().use { target -> source.copyTo(target) } }
                 }
